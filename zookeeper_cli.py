@@ -26,7 +26,8 @@ def parse_args():
     parser.add_argument('--target', '-t', default='zk:2181', \
         help="Zookeeper server host")
     parser.add_argument('--action', '-a', required=True, \
-        choices=['get','stats','set','deploy','tree','del','list','status'], \
+        choices=['get','stats','set','deploy','tree',
+            'del','list','status', 'create'], \
         help="What to do next")
     parser.add_argument('--znode', '-z', type=str, help="Target ZNode")
     parser.add_argument('--values', '-v', type=check_json, help="Json input")
@@ -112,8 +113,10 @@ def cmd_status():
 def cmd_get():
     """ Get data-only of a given znode """ 
     check_znode_exists()
-    output_data = zk.get(args.znode)[0].decode()
-    print(output_data.rstrip())
+    output_data = zk.get(args.znode)[0]
+    if not output_data == None:
+        output_data = output_data.decode()
+        print(output_data.rstrip())
 
 
 def cmd_stats():
@@ -133,15 +136,25 @@ def cmd_del():
     zk.delete(args.znode, recursive=True)
 
 
-def create_and_set():
+def create():
+    check_option(args.znode, "'Set' action needs --znode (or -z) positionned.")
     try:
         if not zk.exists(args.znode):
             print("Creating znode {0}".format(args.znode))
             zk.ensure_path(args.znode)
+    except ZookeeperError as e:
+        print("""Error during creation/insertion of keys/values.
+            Full error follows : \n {0}""".format(e)) 
+    
+
+def set_value():
+    check_option(args.znode, "'Set' action needs --znode (or -z) positionned.")
+    try:
         zk.set(args.znode, args.values)
     except ZookeeperError as e:
         print("""Error during creation/insertion of keys/values.
             Full error follows : \n {0}""".format(e)) 
+
 
 def read_json_from_file(f):
     _j = f.read().rstrip()
@@ -156,13 +169,12 @@ def cmd_set():
         print("'Set' action needs option --input or --values positionned.")
         tear_down(1)
 
-    check_option(args.znode, "'Set' action needs --znode (or -z) positionned.")
-
     if args.input:
         with open(args.input) as f:
-            args.value = read_json_from_file(f)
+            args.values = read_json_from_file(f)
 
-    create_and_set()
+    create()
+    set_value()
 
 
 def cmd_deploy():
@@ -184,6 +196,7 @@ def cmd_deploy():
                    args.values = read_json_from_file(p)
                    args.znode = key
                    create_and_set()
+
 
 def cmd_tree():
     """ Print a tree of all znodes, starting from either ROOT, or any znode"""
@@ -208,11 +221,11 @@ class ZNode():
     def show_tree_node(self, c):
         if self.level > 1:
             print("{0}{1}{2} {3}".format('    ' * self.level,
-                '└', '─' * self.level, basename(c)))
+                '└', '─' * self.level, c))
         elif self.level == 1:
-            print("  {0} {1}".format('└───', basename(c)))
+            print("  {0} {1}".format('└───', c))
         else:
-            print("{0} {1}".format('.', basename(c)))
+            print("{0} {1}".format('.', c))
 
 
 def main():
@@ -226,6 +239,8 @@ def main():
 
     if "get" in args.action:
         cmd_get()
+    elif "create" in args.action:
+        create()
     elif "stats" in args.action:
         cmd_stats()
     elif "set" in args.action:
