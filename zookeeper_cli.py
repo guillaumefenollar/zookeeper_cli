@@ -27,7 +27,7 @@ def parse_args():
         help="Zookeeper server host")
     parser.add_argument('--action', '-a', required=True, \
         choices=['get','stats','set','deploy','tree',
-            'del','list','status', 'create'], \
+            'del','list','status', 'create', 'exists'], \
         help="What to do next")
     parser.add_argument('--znode', '-z', type=str, help="Target ZNode")
     parser.add_argument('--values', '-v', type=check_json, help="Json input")
@@ -97,6 +97,16 @@ def cmd_list():
     else:
         for i in data:
             print(i)
+
+
+def cmd_exists():
+    """ Only check znode existence. Exit code 0 if its there, 1 if it's not. """
+    check_option(args.znode, "Option --znode (or -z) is the only required positional argument.")
+    if zk.exists(args.znode):
+        print('Znode {0} already exists in the tree.'.format(args.znode))
+        tear_down(0)
+    else:
+        tear_down(1)
 
 
 def cmd_status():
@@ -243,6 +253,8 @@ def main():
         create()
     elif "stats" in args.action:
         cmd_stats()
+    elif "exists" in args.action:
+        cmd_exists()
     elif "set" in args.action:
         cmd_set()
     elif "deploy" in args.action:
